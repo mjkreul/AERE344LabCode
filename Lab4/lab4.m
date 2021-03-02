@@ -7,96 +7,85 @@ P_atm = 99000; %pascals
 R = 287; %temp constant J/kg*K
 rho_water = 997; %density of water kg/m^3
 T = 22 + 273.15; %Kelvin
+rho = P_atm*R*T; %
+K = 1.1; % may need to change this
 
-
-%% Parsing the file values
+%% Parsing the file values and averaging them
 % I moved all of the files into the working directory for easier access
-CSVFiles = dir(fullfile('.', '*.csv'));
-% testingfiles = dir(fullfile('.', '*in.txt'));
+% NOTE: matlab does NOT read "pwd" as the directory in which this file is
+% saved, instead it reads as the CURRENT FOLDER THAT IS OPEN IN THE CURRENT
+% FOLDER TAB!!!! This is so dumb... who the fuck creates a programming
+% language that does this???
+CSVFiles = dir(fullfile(pwd, '*.csv'));
 
-
-% Display the names
-CSVFiles.name;
-
-
-% get the number of files for the calibration and other test
+% get the number of files
 [numFiles, junk] = size(CSVFiles);
 
+% initialize an array to hold all of the averages of the pressures
 pressureAvg = [];
-
+P_A_P_EAvg = [];
 for i = 1:numFiles
+    % import the table
     importedCSV = readtable(CSVFiles(i).name);
-    first = importedCSV(:, 2:17);
+    % grab the "first" 16 columns (there is a single column that is the ms)
+    first = importedCSV(:, 2:17); 
+    % grab the "second" 2 columns (there are a lot of values for
+    % temperature)
     second = importedCSV(:, 35:36);
-    combined = [first, second];
-    [rows, cols] = size(combined);
-    for j = 1:cols
-        pressureAvg(:,i) = mean(combined(:,j));
-    end
+    % concatenate them...
+    combinedTable = [first, second];
+    % then change them from a table to an array... I fucking hate matlab...
+    combined = combinedTable{:,:};
+    % get the average of each
+    averagedP = mean(combined);
+    % then transpose it to make it a column
+    pressureAvg(:,i) = averagedP';
+    
+    % Get PA and PE and do the same thing to them
+    P_A_P_ETable = importedCSV(:,37:38);
+    P_A_P_E = P_A_P_ETable{:,:};
+    averagedP_A_P_E = mean(P_A_P_E);
+    P_A_P_EAvg(:,i) = averagedP_A_P_E';
 end
 
-% Get the values from the given files
-% [calvolt, calvolttime, calH2OHeight] = parseTestFilesLab4(lengthCal, files);
+% Write the values to a csv file to import into LaTeX doc
+writetable(array2table(pressureAvg), 'outputFiles/avgP.csv', 'Delimiter', ';');
+writetable(array2table(P_A_P_EAvg), 'outputFiles/avgP_A_P_E.csv', 'Delimiter', ';');
+
+%% Get Dynamic Pressure and Velocity
+
+% init q array
+q = [];
+% v = sqrt(2(P_A - P_E)/rho*k)
+v = [];
+for i = 1:numFiles
+    P_AmP_E = P_A_P_EAvg(1, i) - P_A_P_EAvg(2, i);
+    
+    q(i) = P_AmP_E;
+    v(i) = sqrt((2*P_AmP_E)/(rho * K));
+    
+end
+
+%% Get Cp
+
+[rows, cols] = size(pressureAvg);
+Cp = zeros(rows, cols);
+for i = 1:cols
+    for j = 1:rows
+        Cp(j, i) = pressureAvg(j,i)/q(i);
+    end
+end
+    
+    
+    
+    
+    
+    
 
 
 
 
-%% Converting all of the values
-% calPressures = calH2OHeight * inH2OtoPa;
-% rho = P_atm/(R*T);
-% 
-% %% Calibration Data
-% 
-% %extracting average values of voltage
-% calvoltavg = zeros(10,1);
-% for i = 1:10
-%     calvoltavg(i) = mean(calvolt(:,i));
-% end
-% 
-% %linear regression for calculating test data
-% p = polyfit(calvoltavg,calPressures',1);
-% C = p(1);
-% v0 = p(2);
-% 
-% %plotting voltage vs pressure
-% figure(1)
-% plot(calvoltavg,calPressures)
-% xlabel('Sensor Voltage')
-% ylabel('Pressure Applied to Sensor (Pa)')
-% title('Voltage vs Applied Pressure')
-% 
-% %% Test Data
-% 
-% %assign empty matrix
-% avgtestvals = zeros(25,2);
-% 
-% %calculating average values for voltage
-% for i = 1:13
-%     avgtestvals(i,1) = (i*0.5)-0.5;
-%     avgtestvals(i,2) = mean(testvolt(:,i));
-% end
-% 
-% %mirroring average values for 2nd half of section
-% for i = 14:25
-%     avgtestvals(i,1) = (i*0.5)-0.5;
-%     revref = 26 - i;
-%     avgtestvals(i,2) = avgtestvals(revref,2);
-% end
-% 
-% %calculating voltage -> dynamic pressure -> velocity
-% testpressures = (avgtestvals(:,2)*C)+v0;
-% testvelocities = sqrt(2*rho*testpressures);
-% 
-% %plotting dynamic pressure cross section
-% figure(2)
-% plot(testpressures,avgtestvals(:,1))
-% xlabel('Dynamic Pressure (Pa)')
-% ylabel('Distance From Wall (in)')
-% title('Tunnel Dynamic Pressure Cross-Section')
-% 
-% %plotting velocity cross section
-% figure(3)
-% plot(testvelocities,avgtestvals(:,1))
-% xlabel('Velocity (m/s)')
-% ylabel('Distance From Wall (in)')
-% title('Tunnel Velocity Cross-Section')
+
+
+
+
