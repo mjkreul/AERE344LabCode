@@ -22,7 +22,6 @@ CSVFiles = dir(fullfile(pwd, '*.csv'));
 
 CSVFiles.name;
 
-names = [];
 % get the number of files
 [numFiles, junk] = size(CSVFiles);
 
@@ -31,11 +30,6 @@ pressureAvg = [];
 P_A_P_EAvg = [];
 for i = 1:numFiles
     % import the table
-    % get the name from the input struct
-    stringname = CSVFiles(i).name;
-    % set the name as the file name minus the "_iw.txt" or "_in.txt"
-    names(1,i) = str2double(strtok(stringname,"."));
-    % open the file
     importedCSV = readtable(CSVFiles(i).name);
     % grab the "first" 18 columns (there is a single column that is the ms)
     pressureTable = importedCSV(:, 2:19); 
@@ -118,7 +112,8 @@ for plotNum = 1:cols
     plot(C_P(:,plotNum));  
     xlabel("Air Intakes");
     ylabel("Coefficient of Pressure");
-    title(sprintf("Coefficient of pressure at %dHz",names(1,i)) );
+    titleString = sprints
+    title("
 end
 
 figure(plotNum);
