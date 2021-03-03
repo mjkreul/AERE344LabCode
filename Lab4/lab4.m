@@ -2,6 +2,7 @@
 % Section 1
 % Group 1
 clear, clc
+pause on
 %% Constants
 P_atm = 99000; %pascals
 R = 287; %temp constant J/kg*K
@@ -52,10 +53,7 @@ for i = 1:numFiles
     P_A_P_EAvg(:,i) = averagedP_A_P_E';
 end
 
-% Write the values to a csv file to import into LaTeX doc
-writetable(array2table(pressureAvg), 'outputFiles/avgP.csv', 'Delimiter', ';');
-writetable(array2table(P_A_P_EAvg), 'outputFiles/avgP_A_P_E.csv',...
-    'Delimiter', ';');
+
 
 %% Get Dynamic Pressure and Velocity
 
@@ -98,7 +96,8 @@ for i = 1:cols
     end
     C_D(i) = sum*(-(20*pi/180)/2);
 end
-    
+
+
  
 %% Get C_D as function of Re
 % Re = (rho*V_inf*D)/mu
@@ -110,7 +109,13 @@ for i = 1:cols
     Re(i) = (rho*v(i)*D(i))/mu;
 end
 
-
+%% Tables 
+% Write the values to a csv file to import into LaTeX doc
+writetable(array2table(pressureAvg), 'outputFiles/avgP.csv', 'Delimiter', ';');
+writetable(array2table(P_A_P_EAvg), 'outputFiles/avgP_A_P_E.csv',...
+    'Delimiter', ';');
+writetable(array2table(C_P), 'outputFiles/C_P.csv', 'Delimiter', ';');
+writetable(array2table(C_D), 'outputFiles/C_D.csv', 'Delimiter', ';');
 %% Plots
 
 for plotNum = 1:cols
@@ -118,16 +123,19 @@ for plotNum = 1:cols
     plot(C_P(:,plotNum));  
     xlabel("Air Intakes");
     ylabel("Coefficient of Pressure");
-    title(sprintf("Coefficient of pressure at %dHz",names(1,i)) );
+    title(sprintf("Coefficient of pressure at %dHz",names(1,plotNum)) );
+%     pause(1);
 end
 
-figure(plotNum);
+
+
+figure(plotNum+1);
 plot(C_D, Re)  
 xlabel("Coefficient of Drag");
 ylabel("Reynolds Number");
 title("Coefficient of Drag as a function of Reynolds Number");
 
-
+plot(C_P_theoretical);
 
 
 
