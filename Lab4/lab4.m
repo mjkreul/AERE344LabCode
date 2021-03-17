@@ -1,7 +1,7 @@
 %% AER E 344 Lab 4 Calculations
 % Section 1
 % Group 1
-clear, clc
+clear, clc, clf
 pause on
 %% Constants
 P_atm = 99000; %pascals
@@ -56,7 +56,6 @@ end
 
 
 %% Get Dynamic Pressure and Velocity
-
 % init q array
 q = [];
 % v = sqrt(2(P_A - P_E)/rho*k)
@@ -64,78 +63,93 @@ v = [];
 for i = 1:numFiles
     P_AmP_E = P_A_P_EAvg(1, i) - P_A_P_EAvg(2, i);
     q(i) = K*P_AmP_E;
-    v(i) = sqrt((2*P_AmP_E)/(rho * K));
+    v(i) = sqrt((2*q(i))/(rho));
 end
 
 %% Get Cp
-% C_P = average pressure of each point/dynamic pressure at that air speed
+% C_P = average pressure of each point - P_E for that speed/dynamic 
+% pressure at that air speed
 % C_P_theoretical = 1-4*sin(theta)*sin(theta)
 [rows, cols] = size(pressureAvg);
 C_P = zeros(rows, cols);
 for i = 1:cols
     for j = 1:rows
-        C_P(j, i) = pressureAvg(j,i)/q(i);
+        C_P(j, i) = (pressureAvg(j,i) - P_A_P_EAvg(2,i))/q(i);
     end
 end
-C_P_theoretical = 1-4*sin((-180:5:180)*pi/180).*sin((-180:5:180)*pi/180);
+C_P_theoretical = 1-4*sind((-180:0.5:180)).*sind((-180:0.5:180));
 
-%% Get D 
-
-%integral -pi to pi, P*cos(theta)*R*dtheta
+%% Get D and C_D
+% integral -pi to pi, P*cos(theta)*R*dtheta
 % = -deltaTheta/2 * sum_{i = 1}^{n} C_pi*cos(theta)
 % start theta from 360 and subtract by 20 until theta = 0
 % 
-    
 C_D = [];
-
 for i = 1:cols
-    theta = 360;
+    theta = 0;
+    sum = 0;
     for j = 1:rows
-        sum = C_P(j,i)* cos(theta*(pi/180));
-        theta = theta - 20;
+        sum = sum + C_P(j,i)* cosd(theta);
+        theta = theta + 20;
     end
-    C_D(i) = sum*(-(20*pi/180)/2);
+    C_D(i) = sum*(-(pi/18));
 end
-
-
  
-%% Get C_D as function of Re
+%% Get Re
 % Re = (rho*V_inf*D)/mu
 % D = C_D*rho*V_inf^2*2*R*0.5
-D = [];
 Re = [];
 for i = 1:cols
-    D(i) = C_D(i)*rho*(v(i)^2)*dia*0.5;
-    Re(i) = (rho*v(i)*D(i))/mu;
+    Re(i) = (rho*v(i)*dia)/mu;
 end
 
 %% Tables 
 % Write the values to a csv file to import into LaTeX doc
-writetable(array2table(pressureAvg), 'outputFiles/avgP.csv', 'Delimiter', ';');
-writetable(array2table(P_A_P_EAvg), 'outputFiles/avgP_A_P_E.csv',...
-    'Delimiter', ';');
-writetable(array2table(C_P), 'outputFiles/C_P.csv', 'Delimiter', ';');
-writetable(array2table(C_D), 'outputFiles/C_D.csv', 'Delimiter', ';');
+writetable(array2table(round(pressureAvg,4)), 'outputFiles/avgP.csv', 'Delimiter', ',');
+writetable(array2table(round(P_A_P_EAvg,4)), 'outputFiles/avgP_A_P_E.csv',...
+    'Delimiter', ',');
+writetable(array2table(round(C_P, 4)), 'outputFiles/C_P.csv', 'Delimiter', ',');
+writetable(array2table(round(C_D,4)), 'outputFiles/C_D.csv', 'Delimiter', ',');
+writetable(array2table(round(Re,4)), 'outputFiles/Re.csv', 'Delimiter', ',');
+
 %% Plots
 
+% Plotting all of the C_P for each intake 
 for plotNum = 1:cols
     figure(plotNum);
-    plot(C_P(:,plotNum));  
-    xlabel("Air Intakes");
+    plot(-180:20:160, C_P(:,plotNum),'-o', 'LineWidth', 2.0);  
+    grid on
+    xlabel("Air Inlet Angles (degrees)");
     ylabel("Coefficient of Pressure");
     title(sprintf("Coefficient of pressure at %dHz",names(1,plotNum)) );
+    set(gca,'FontSize',14)
+    % Output figure to a png file (Note this only works in matlab2020a and
+    % newer...
+    exportgraphics(gcf,sprintf('outputfiles/f%d.png',plotNum),'Resolution',300)
 %     pause(1);
+    
 end
 
+% Plotting the theoretical C_P
+figure(plotNum+1)
+plot(-180:0.5:180, C_P_theoretical, 'LineWidth', 2.0);
+grid on
+xlabel("Angle (Degrees)")
+ylabel("Theoretical Coefficient of Pressure");
+title("Theoretical Coefficient of Pressure");
+set(gca,'FontSize',14)
+exportgraphics(gcf,sprintf('outputfiles/f%d.png',plotNum+1),'Resolution',300)
 
+% Plotting C_D and Re
+figure(plotNum+2);
+plot(Re, C_D, '-o', 'LineWidth', 2.0)  
+grid on
+ylabel("Coefficient of Drag");
+xlabel("Reynolds Number");
+title("C_D as a function of Reynolds Number");
+set(gca,'FontSize',14)
+exportgraphics(gcf,sprintf('outputfiles/f%d.png',plotNum+2),'Resolution',300)
 
-figure(plotNum+1);
-plot(C_D, Re)  
-xlabel("Coefficient of Drag");
-ylabel("Reynolds Number");
-title("Coefficient of Drag as a function of Reynolds Number");
-
-plot(C_P_theoretical);
 
 
 
