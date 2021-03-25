@@ -15,19 +15,17 @@ rho = P_atm/(R*T); %density of air kg/m^3
 K = 1.14393; % may need to change this
 mu = 1.825*10^(-5); % dynamic viscosity of air
 c = 0.101; %chord length (m)
+inH2OtoPa = 248.84; %Pa
 
 %% Opening and parsing data
 
 ai1 = load('n4.csv');
 ai2 = load('0.csv');
 ai3 = load('4.csv');
-ai4 = load('8.csv');
-ai5 = load('10.csv');
-ai6 = load('12.csv');
-
-% coords = load('coordinates.txt');
-% x = coords(:,1);
-% y = coords(:,2);
+ai4 = load('6.csv');
+ai5 = load('8.csv');
+ai6 = load('10.csv');
+ai7 = load('12.csv');
 
 for i = 2:44
     a1(i-1) = mean(ai1(:,i));
@@ -36,6 +34,7 @@ for i = 2:44
     a4(i-1) = mean(ai4(:,i));
     a5(i-1) = mean(ai5(:,i));
     a6(i-1) = mean(ai6(:,i));
+    a7(i-1) = mean(ai7(:,i));
 end
 
 
@@ -51,7 +50,8 @@ P_A_P_ETable(5,1) = a5(:,42);
 P_A_P_ETable(5,2) = a5(:,43);
 P_A_P_ETable(6,1) = a6(:,42);
 P_A_P_ETable(6,2) = a6(:,43);
-
+P_A_P_ETable(7,1) = a7(:,42);
+P_A_P_ETable(7,2) = a7(:,43);
 
 PA = P_A_P_ETable(:,1);
 PE = P_A_P_ETable(:,2);
@@ -62,9 +62,9 @@ p(:,3) = a3(1:41)';
 p(:,4) = a4(1:41)';
 p(:,5) = a5(1:41)';
 p(:,6) = a6(1:41)';
+p(:,7) = a7(1:41)';
 
-
-numFiles = 6;
+numFiles = 7;
 
 %% Get Dynamic Pressure and Velocity
 
@@ -73,9 +73,12 @@ q = [];
 % v = sqrt(2(P_A - P_E)/rho*k)
 v = [];
 for i = 1:numFiles
+    % get pa - pe
     P_AmP_E = PA(i) - PE(i);
+    % dynamic pressure = k*pa - pe
     q(i) = K*P_AmP_E;
-    v(i) = sqrt((2*P_AmP_E)/(rho * K));
+    % velocity of airflow = sqrt(2*q/rho)
+    v(i) = sqrt((2*K*P_AmP_E)/(rho));
 end
 
 %% Get Cp and velocity of each place
@@ -85,48 +88,136 @@ C_P = zeros(41, numFiles);
 u = zeros(41, numFiles);
 for i = 1:numFiles
     for j = 1:41
+        % cp = pressure/dynamic pressure
         C_P(j, i) = p(j,i)/q(i);
-        u(j,i) = sqrt(2*(p(j,i)/q(i) - PE(i))/rho);
+        % v = sqrt(2*(dynamic pressure at that point)/density)
+        % dynamic pressure = ptotal-pstatic
+        % pstatic = pe
+        % ptotal = pressure at that point
+        u(j,i) = sqrt(2*(p(j,i) - PE(i))/rho);
     end
 end
 
 %% Plotting Cp values
 
-angle = [-4, 0, 4, 8, 10, 12,];
+angle = [-4, 0, 4, 6, 8, 10, 12];
 for i = 1:numFiles
     figure(i)
-    plot(0:2:80,C_P(:,i))
-    xticks(0:4:80)
-    xlabel('Rake Positions (mm)')
-    ylabel('Coefficient of Pressure, C_P')
+    % plot figures against
+    plot(C_P(:,i), 0:2:80)
+    yticks(0:4:80)
+    grid on
+    ylabel('Rake Positions (mm)')
+    xlabel('Coefficient of Pressure, C_P')
     title(['Angle of Attack ', num2str(angle(i)), char(176)])
-%     exportgraphics(gcf,sprintf('outputfiles/f%d.png',i+1),'Resolution',300)
+    exportgraphics(gcf,sprintf('outputfiles/f%d.png',i),'Resolution',300)
 end
+
+% superimposed figures
+figure(numFiles+1)
+hold on
+for i = 1:numFiles
+    plot(C_P(:,i), 0:2:80)
+end
+grid on
+hold off
+yticks(0:4:80)
+ylabel('Rake Positions (mm)')
+xlabel('Coefficient of Pressure, C_P')
+title('All AoA C_P Superimposed');
+superimpcplgd =legend(['-4',char(176), ' AoA'],['0',char(176), ' AoA'],...
+    ['4',char(176), ' AoA'], ['6',char(176), ' AoA'],['8',char(176), ' AoA'],...
+    ['10',char(176), ' AoA'], ['12',char(176), ' AoA']);
+superimpcplgd.Location = 'Northwest';
+exportgraphics(gcf,sprintf('outputfiles/f10.png'),'Resolution',300)
 
 %% Calculating Drag
 
-%preallocating variables
+Cd =[];
 
+%  cd = (2/c)\integral ((u(y)/u_inf)*(1 - u(y)/u_inf))dy
+% represented by trapezoidal rule of sum i = 2 to n
+% h*(f(x)_{i-1} + f(x)_{i})/2 
+% where f(x) = ((u(y)/u_inf)*(1 - u(y)/u_inf))*(2/c)
 for i = 1:numFiles %calculating coefficients
     %coefficient of drag
     dragSum = 0;
-    for j = 1:41
-        dragSum = dragSum + ((u(j,i)/v(i))*(1 - (u(j,i)/v(i))))*0.002; 
+    trapTerm = 0;
+    %trapezoidal rule for getting the coefficient of drag
+    for j = 2:40
+        trapTerm = trapTerm + ((u(j,i)/v(i))*(1 - u(j,i)/v(i)))*(2/c);
+        %function of the left term f(x)_{i-1}
+%         trapTerm1 = ((u(j-1,i)/v(i))*(1 - u(j-1,i)/v(i)))*(2/c);
+%         %function of the right term f(x)_{i}
+%         trapTerm2 = ((u(j,i)/v(i))*(1 - u(j,i)/v(i)))*(2/c);
+        %apply trapezoidal rule
+%         tempIntegral = ((trapTerm1 + trapTerm2)/2)*0.002;
+        %add value to sum
+%         dragSum = dragSum + tempIntegral;
     end
-    Cd(i) = dragSum*(2/c);
+    trapTerm = 0.002*(trapTerm + (((u(41,i)/v(i))*(1 - u(41,i)/v(i))) + ((u(1,i)/v(i))*(1 - u(1,i)/v(i))))/2);
+    Cd(i) = trapTerm;
 end
-%% Plotting Drag
 
-% 
-figure(10)
+%% Plotting Drag
+figure(numFiles+2)
 plot(angle,Cd)
+grid on
 title('Coefficient of Drag vs Angle of Attack')
 xlabel(['Angle of Attack (', char(176), ')'])
 ylabel('C_d')
+exportgraphics(gcf,sprintf('outputfiles/f%d.png',i+1),'Resolution',300)
+
+%% Getting Re
+% for i =1:numFiles
+%     Re(i) = (rho*v(i)*c*abs(sind(angle(i))))/mu;
+% end
 
 
 %% Hotwire Calibration
+calibrationfiles = dir(fullfile('.', '*iw.txt'));
 
+calibrationfiles.name;
+% get the number of files for the calibration and other test
+[lengthCal, junk] = size(calibrationfiles);
+
+% Get the values from the given files
+[calvolt, calvolttime, calH2OHeight] = parseTestFiles(lengthCal, calibrationfiles);
+
+%% Changing H2O values to pascals and getting velocity
+
+qCal = zeros(1, lengthCal);
+vCal = zeros(1, lengthCal);
+for i = 1:lengthCal
+    qCal(i) = calH2OHeight(i)*inH2OtoPa;
+    vCal(i) = sqrt((qCal(i)*2)/rho);
+end
+
+%% Getting average of voltage for the hotwire
+voltAvg = zeros(1, lengthCal);
+
+for i = 1:lengthCal
+    voltAvg(i) = mean(calvolt(:,i));
+end
+%% Getting polyfit line
+
+coeff = polyfit(vCal, voltAvg, 4); 
+
+xVals = 0:(14/100):14;
+
+yVals = polyval(coeff, xVals);
+
+figure(numFiles+3)
+
+plot(voltAvg, vCal, 'o');
+hold on
+plot(yVals, xVals)% I know this looks wrong but trust me its correct
+grid on
+hold off
+ylabel('Velocity (m/s)');
+xlabel('Voltage (V)');
+title('Velocity vs. Voltage for Hot Wire');
+exportgraphics(gcf,sprintf('outputfiles/f%d.png',numFiles+2),'Resolution',300)
 
 
 %% Sending calculated data to csv files
@@ -135,10 +226,9 @@ ylabel('C_d')
 %     'Delimiter', ',');
 % 
 % writetable(array2table(round(C_P, 4)), 'outputFiles/C_P.csv', 'Delimiter', ',');
+writetable(array2table(round(Cd', 4)), 'outputFiles/C_D.csv', 'Delimiter', ',');
+% 
+% writetable(array2table(round(u, 4)), 'outputFiles/u.csv', 'Delimiter', ',');
+% 
 % writetable(array2table(round(Cd', 4)), 'outputFiles/C_D.csv', 'Delimiter', ',');
-% 
-% writetable(array2table(round(Cl', 4)), 'outputFiles/C_l.csv', 'Delimiter', ',');
-%  
-% 
-% writetable(array2table(round(Cm', 4)), 'outputFiles/C_m.csv', 'Delimiter', ',');
 
